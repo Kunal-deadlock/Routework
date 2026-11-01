@@ -1,0 +1,14 @@
+vrp
+vrp.exe
+tests/vrp_tests
+tests/vrp_tests.exe
+tests/roundtrip.csv
+tests/invalid.csv
+tests/routes.csv
+tests/routes.svg
+results/smoke/
+results/cli/
+routes.csv
+routes.svg
+.taste-skill/inspect/
+.taste-skill/experiments/

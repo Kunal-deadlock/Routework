@@ -1,0 +1,15 @@
+# Portable compiler downloaded for local builds.
+/w64devkit/
+/tools/
+/w64devkit.7z.exe
+/toolchain-release.json
+
+# Local inspection output, editor state, dependencies, and secrets.
+.taste-skill/
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db

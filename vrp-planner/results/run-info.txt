@@ -1,0 +1,10 @@
+C++17, standard library only; steady_clock solver timer; independent verifier outside timer.
+Base seed: 42
+Runs per size: 10
+Search node/live-node limit: 100000
+Search time limit ms: 500
+Build: -std=c++17 -O2
+Time values depend on hardware and load. Standard deviation is sample SD.
+Hard E8 instances use a synthetic near-equal symmetric metric, not Haversine.
+E1 uses one vehicle so Held-Karp and VRP solve the same problem.
+E5 repeats a fixed illustrative synthetic Nashik dataset (not independently sampled runs).
