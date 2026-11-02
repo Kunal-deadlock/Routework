@@ -4,6 +4,9 @@ const $ = id => document.getElementById(id);
 const colors = ['#1b6c80','#2f70bb','#a86f0c','#56656c'];
 const state = {stops:[], result:null, selected:'cw+2opt', vehicle:null, layer:'planned', busy:false, dirty:false, name:'Nashik · 15 stops', sample:true, zoom:1, panX:0, panY:0, progress:0, playing:false, frame:null, experiment:'E1', benchmarkRows:null};
 const seriesChoices={};
+state.mapMode='street';
+state.followRoads=true;
+let roadPlanKey='',roadGeneration=0;
 const titles = {baseline:'Listed order',nn:'Nearest neighbour',cw:'Clarke–Wright',sweep:'Sweep clusters',exact:'Subset DP',hk:'Held–Karp',bt:'Backtracking','bb-fifo':'Branch & bound · FIFO','bb-lifo':'Branch & bound · LIFO','bb-lc':'Branch & bound · least cost'};
 const experiments = {
   E1:['Exact scaling','How exact solvers grow from 5 to 15 stops. One vehicle keeps the problem identical across methods.','ms'],
@@ -131,10 +134,11 @@ function renderVehicles() {
   const stops=state.result.instance.stops,capacity=state.result.instance.capacity;
   $('vehicle-list').innerHTML=solution.routes.map((route,i)=> {
     const selected=state.vehicle===i;
-    const visits=route.visits.map((visit,j)=>`<li><span>${j===0?'Start · ':j===route.visits.length-1?'Return · ':j+'. '}${esc(stops[visit.index].name)}</span><small>${fmt(visit.km)} km</small></li>`).join('');
-    return `<article class="vehicle-card${selected?' selected':''}" style="--route-color:${colors[i%colors.length]}"><button class="vehicle-top" data-vehicle="${i}" aria-expanded="${selected}"><span class="route-swatch"></span><strong>Vehicle ${i+1}</strong><span class="route-distance">${fmt(route.dist)} km</span></button><p class="vehicle-facts">${route.nodes.length-2} stops · starts & ends at depot</p><div class="capacity-track" role="meter" aria-label="Vehicle ${i+1} load" aria-valuenow="${route.load}" aria-valuemin="0" aria-valuemax="${capacity}"><span style="width:${100*route.load/capacity}%"></span></div><div class="capacity-label"><span>Load ${route.load} / ${capacity}</span><span>${fmt(100*route.load/capacity,0)}% full</span></div>${selected?'<ol class="route-detail">'+visits+'</ol>':''}</article>`;
+    const road=state.mapMode==='street'&&state.followRoads?RoadRoutes.peek(stops,route):null,ready=road?.status==='ready';let km=0;
+    const visits=route.visits.map((visit,j)=> {if(j&&ready) km+=road.legs[j-1].distanceKm;return `<li><span>${j===0?'Start · ':j===route.visits.length-1?'Return · ':j+'. '}${esc(stops[visit.index].name)}</span><small>${fmt(ready?km:visit.km)} km</small></li>`;}).join('');
+    return `<article class="vehicle-card${selected?' selected':''}" style="--route-color:${colors[i%colors.length]}"><button class="vehicle-top" data-vehicle="${i}" aria-expanded="${selected}"><span class="route-swatch"></span><strong>Vehicle ${i+1}</strong><span class="route-distance">${fmt(ready?road.distanceKm:route.dist)} km</span></button><p class="vehicle-facts">${route.nodes.length-2} stops · ${ready?'road distance':'estimated distance'}</p><div class="capacity-track" role="meter" aria-label="Vehicle ${i+1} load" aria-valuenow="${route.load}" aria-valuemin="0" aria-valuemax="${capacity}"><span style="width:${100*route.load/capacity}%"></span></div><div class="capacity-label"><span>Load ${route.load} / ${capacity}</span><span>${fmt(100*route.load/capacity,0)}% full</span></div>${selected?'<ol class="route-detail">'+visits+'</ol>':''}</article>`;
   }).join('');
-  $('verification').classList.remove('unverified');$('verification').querySelector('span').textContent=solution.optimal?'Verified · proven optimal':'Verified · every stop, within capacity';
+  $('verification').classList.remove('unverified');$('verification').querySelector('span').textContent=solution.optimal?'Verified · optimal for planner estimates':'Verified · every stop, within capacity';
 }
 function renderComparison() {
   if(!state.result || state.result.solutions.length<3) {$('comparison-body').innerHTML='<tr><td colspan="7" class="empty">Compare methods to see their distances, work, and proof status.</td></tr>';$('comparison-note').textContent='Compare distance and effort on exactly the same stops.';return;}
@@ -147,8 +151,42 @@ function renderComparison() {
   }).join('');
 }
 let projection=null;
+function roadSummary(stops,routes) {
+  $('follow-roads').disabled=state.mapMode!=='street';$('retry-roads').hidden=true;
+  if(state.mapMode!=='street'||!state.followRoads) {$('road-status').textContent='Estimated links · no road lookup';return;}
+  if(!routes.length) {$('road-status').textContent='Plan routes to find drivable paths';return;}
+  const entries=routes.map(r=>RoadRoutes.peek(stops,r)),ready=entries.filter(r=>r?.status==='ready'),error=entries.find(r=>r?.status==='error');
+  if(error) {$('road-status').textContent=error.message+' Dashed links are estimates.';$('retry-roads').hidden=false;return;}
+  if(ready.length!==routes.length) {$('road-status').textContent=`Finding road paths · ${ready.length}/${routes.length} vehicles ready`;return;}
+  const km=ready.reduce((s,r)=>s+Math.round(r.distanceKm*100),0)/100,minutes=ready.reduce((s,r)=>s+r.durationMinutes,0),snap=Math.max(...ready.flatMap(r=>r.snaps.map(s=>s.meters)));
+  $('road-status').textContent=`${fmt(km)} km by road · ${fmt(minutes,0)} min driving${snap>250?' · check snapped stop locations':''}`;
+}
+function ensureRoadRoutes(stops,routes) {
+  const active=state.mapMode==='street'&&state.followRoads;
+  const key=active?JSON.stringify([stops.map(s=>[s.lat,s.lon]),routes.map(r=>r.nodes)]):'';
+  if(key===roadPlanKey) return;
+  roadPlanKey=key;const generation=++roadGeneration;if(!active||!routes.length) return;
+  (async()=> {
+    for(const route of routes) {
+      await RoadRoutes.load(stops,route);if(generation!==roadGeneration) return;
+      renderMap();renderVehicles();
+    }
+    if(generation===roadGeneration&&state.mapMode==='street') StreetMap.fit();
+  })();
+}
 function renderMap() {
   const svg=$('route-map');const stops=state.result?.instance.stops || state.stops;
+  if(state.mapMode==='street'&&!window.StreetMap?.available()) {state.mapMode='coordinates';$('map-view').value='coordinates';}
+  const street=state.mapMode==='street';
+  svg.toggleAttribute('hidden',street);$('street-map').hidden=!street;$('map-stage').classList.toggle('live',street);
+  const solution=state.layer==='baseline'?baseline():current(),activeRoutes=hasPlan(solution)?solution.routes:[];
+  ensureRoadRoutes(stops,activeRoutes);roadSummary(stops,activeRoutes);
+  $('map-caption-text').textContent=street?(state.followRoads?'Road paths · OSRM / OpenStreetMap':'Street map · estimated links'):'Coordinate view · estimated distances';
+  if(street) {
+    StreetMap.render(stops,activeRoutes,state.vehicle,colors,state.layer==='baseline',state.followRoads?activeRoutes.map(r=>RoadRoutes.peek(stops,r)):[]);
+    updatePlayback();return;
+  }
+  window.StreetMap?.setEnabled(false);$('map-network-note').hidden=true;
   if(!stops.length) {svg.innerHTML='<text x="400" y="200" text-anchor="middle" fill="#5d5f60" font-size="14">Add a depot and delivery stops to begin.</text>';return;}
   const latitudes=stops.map(s=>s.lat),longitudes=stops.map(s=>s.lon),centerLat=(Math.min(...latitudes)+Math.max(...latitudes))/2,centerLon=(Math.min(...longitudes)+Math.max(...longitudes))/2;
   const cos=Math.max(.05,Math.cos(centerLat*Math.PI/180));
@@ -157,7 +195,7 @@ function renderMap() {
   const scale=Math.min((W-100)/spanX,(H-110)/spanY),x=lon=>cx+(lon-centerLon)*cos*scale,y=lat=>cy-(lat-centerLat)*scale;
   projection={x,y,invert:(px,py)=>({lat:centerLat+(cy-py)/scale,lon:centerLon+(px-cx)/(cos*scale)})};
   const width=W/state.zoom,height=H/state.zoom;svg.setAttribute('viewBox',`${cx-width/2+state.panX} ${H/2-height/2+state.panY} ${width} ${height}`);
-  const solution=state.layer==='baseline'?baseline():current(),routes=hasPlan(solution)?solution.routes:[];
+  const routes=activeRoutes;
   let grid='';
   for(let i=0;i<4;i++) {const yy=40+i*(H-75)/3,lat=projection.invert(0,yy).lat;grid+=`<path d="M0 ${yy}H${W}" stroke="#dce5e0" stroke-width=".8"/><text x="8" y="${yy-6}" font-size="11" fill="#61776d">${Math.abs(lat).toFixed(3)}° ${lat>=0?'N':'S'}</text>`;}
   for(let i=0;i<3;i++) {const xx=65+i*(W-130)/2,lon=projection.invert(xx,0).lon;grid+=`<path d="M${xx} 0V${H}" stroke="#dce5e0" stroke-width=".8"/><text x="${xx+4}" y="18" font-size="11" fill="#61776d">${Math.abs(lon).toFixed(3)}° ${lon>=0?'E':'W'}</text>`;}
@@ -200,9 +238,14 @@ function routeLegs() {
 function updatePlayback() {
   const legs=routeLegs(),p=state.progress/1000*legs.length,index=Math.min(Math.floor(p),legs.length-1),leg=legs[index];
   $('playback-range').value=state.progress;
-  if(!leg||!projection) {$('playback-label').textContent='Ready to follow the route';return;}
+  if(!leg) {window.StreetMap?.setCourier(null,false);$('playback-label').textContent='Ready to follow the route';return;}
   const a=state.result.instance.stops[leg.from],b=state.result.instance.stops[leg.to],t=Math.min(1,p-index),point=$('courier');
-  if(point) {point.setAttribute('cx',projection.x(a.lon)+(projection.x(b.lon)-projection.x(a.lon))*t);point.setAttribute('cy',projection.y(a.lat)+(projection.y(b.lat)-projection.y(a.lat))*t);point.setAttribute('visibility',state.progress>0?'visible':'hidden');}
+  if(state.mapMode==='street') {
+    const solution=state.layer==='baseline'?baseline():current(),route=solution.routes[leg.vehicle],road=state.followRoads?RoadRoutes.peek(state.result.instance.stops,route):null;
+    const position=road?.status==='ready'?RoadRoutes.position(road.legs[leg.sequence-1],t):[a.lat+(b.lat-a.lat)*t,a.lon+(b.lon-a.lon)*t];
+    StreetMap.setCourier(position,state.progress>0);
+  }
+  else if(point&&projection) {point.setAttribute('cx',projection.x(a.lon)+(projection.x(b.lon)-projection.x(a.lon))*t);point.setAttribute('cy',projection.y(a.lat)+(projection.y(b.lat)-projection.y(a.lat))*t);point.setAttribute('visibility',state.progress>0?'visible':'hidden');}
   $('playback-label').textContent=state.progress===0?'Ready to follow the route':state.progress===1000?'All routes complete':`V${leg.vehicle+1} → ${b.index===0?'depot':'stop '+b.id}`;
 }
 function pause() {state.playing=false;if(state.frame) cancelAnimationFrame(state.frame);state.frame=null;$('play-button').textContent='▶';$('play-button').setAttribute('aria-label','Play delivery route');}
@@ -219,12 +262,14 @@ function renderEditor() {
 function download(name,content,type) {const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportRoutes() {
   const solution=current();if(!hasPlan(solution)) return;const stops=state.result.instance.stops;
-  const rows=['vehicle,sequence,stop_id,name,cumulative_km,arrival_minutes'];
-  solution.routes.forEach((r,v)=>r.visits.forEach((visit,j)=>rows.push([v+1,j,stops[visit.index].id,quote(stops[visit.index].name),visit.km.toFixed(6),visit.arrival.toFixed(2)].join(','))));
+  const rows=['vehicle,sequence,stop_id,name,cumulative_km,arrival_minutes,distance_source'];
+  solution.routes.forEach((r,v)=> {const road=state.followRoads&&state.mapMode==='street'?RoadRoutes.peek(stops,r):null,ready=road?.status==='ready';let km=0,arrival=0;r.visits.forEach((visit,j)=> {if(j&&ready) {km+=road.legs[j-1].distanceKm;arrival+=road.legs[j-1].durationMinutes+stops[r.visits[j-1].index].service;}rows.push([v+1,j,stops[visit.index].id,quote(stops[visit.index].name),(ready?km:visit.km).toFixed(6),(ready?arrival:visit.arrival).toFixed(2),ready?'osrm_driving':'haversine_estimate'].join(','));});});
   download('routes.csv',rows.join('\n')+'\n','text/csv');
 }
 async function showView(view) {
   $('planner-view').hidden=view!=='planner';$('experiments-view').hidden=view!=='experiments';
+  window.StreetMap?.setEnabled(view==='planner'&&state.mapMode==='street');
+  if(view==='planner') renderMap();
   // Keep exactly one semantic page heading for the currently active screen.
   for(const id of ['planner','experiments']) {
     const heading=$(id+'-view').querySelector('.page-heading h1, .page-heading h2'),tag=id===view?'H1':'H2';
@@ -286,7 +331,12 @@ function setLayer(layer) {pause();state.layer=layer;state.vehicle=null;state.pro
 $('planned-layer').addEventListener('click',()=>setLayer('planned'));$('baseline-layer').addEventListener('click',()=>setLayer('baseline'));
 $('play-button').addEventListener('click',play);$('playback-range').addEventListener('input',event=>{pause();state.progress=Number(event.target.value);updatePlayback();});
 function zoom(factor) {state.zoom=Math.max(.5,Math.min(8,state.zoom*factor));renderMap();}
-$('zoom-in').addEventListener('click',()=>zoom(1.3));$('zoom-out').addEventListener('click',()=>zoom(1/1.3));$('fit-map').addEventListener('click',()=>{state.zoom=1;state.panX=state.panY=0;renderMap();});
+$('zoom-in').addEventListener('click',()=>state.mapMode==='street'?StreetMap.zoomIn():zoom(1.3));$('zoom-out').addEventListener('click',()=>state.mapMode==='street'?StreetMap.zoomOut():zoom(1/1.3));$('fit-map').addEventListener('click',()=>{if(state.mapMode==='street') return StreetMap.fit();state.zoom=1;state.panX=state.panY=0;renderMap();});
+function switchMap(mode) {pause();state.mapMode=mode;$('map-view').value=mode;$('map-tooltip').hidden=true;renderMap();}
+$('map-view').addEventListener('change',event=>switchMap(event.target.value));
+$('coordinate-fallback').addEventListener('click',()=>switchMap('coordinates'));
+$('follow-roads').addEventListener('change',event=>{pause();state.followRoads=event.target.checked;state.progress=0;renderMap();renderVehicles();});
+$('retry-roads').addEventListener('click',()=>{RoadRoutes.clearErrors();roadPlanKey='';renderMap();});
 let drag=null,moved=false;
 $('route-map').addEventListener('pointerdown',event=>{if(event.target.closest('[data-stop]')) return;drag={x:event.clientX,y:event.clientY,panX:state.panX,panY:state.panY};moved=false;event.currentTarget.setPointerCapture(event.pointerId);});
 $('route-map').addEventListener('pointermove',event=>{if(!drag) return;state.panX=drag.panX-(event.clientX-drag.x)/state.zoom;state.panY=drag.panY-(event.clientY-drag.y)/state.zoom;moved=true;renderMap();});

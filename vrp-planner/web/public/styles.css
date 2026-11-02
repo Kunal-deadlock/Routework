@@ -26,3 +26,25 @@ table{font-size:13px}th{font-size:12px}.use-button,.status-pill{font-size:12px}.
 .experiment-content{min-width:0}.experiment-table-scroll{max-width:100%;min-width:0}.experiment-chart{min-width:0}.chart-legend li{white-space:normal!important}@media(max-width:1100px){.experiment-layout{grid-template-columns:minmax(0,1fr)}.experiment-layout nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible}.experiment-tab{white-space:normal;min-height:40px;font-size:12px;padding:8px}}@media(max-width:760px){.experiment-layout nav{grid-template-columns:repeat(2,minmax(0,1fr))}.experiment-tab{min-height:40px}.experiment-content .section-heading p{max-width:100%}.experiment-chart svg{max-width:100%}}
 
 .mobile-plan{width:100%;margin:0 0 20px;min-height:40px}
+/* Live street map: preserve OSM attribution and keep controls above Leaflet panes. */
+#street-map{position:absolute;inset:0;z-index:0;font-family:var(--font);background:#e8eeea}
+#street-map[hidden]{display:none}
+.map-stage.live{isolation:isolate}
+.map-stage.live .map-caption{top:12px;bottom:auto;left:12px;background:rgb(255 255 255 / .94);color:var(--text);z-index:500;padding:5px 7px;max-width:220px}
+.map-stage.live .map-tools{top:12px;bottom:auto;z-index:500}
+.map-stage.live .north{display:none}
+.map-style-picker{margin-left:auto;display:flex;align-items:center;min-width:0}
+.map-style-picker select{height:29px;max-width:108px;border:1px solid var(--control);background:white;color:var(--text);border-radius:6px;font:12px var(--font);padding:0 5px}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.map-network-note{position:absolute;left:12px;right:12px;top:53px;z-index:600;background:#fbf8ed;border:1px solid #ddd7c0;border-radius:6px;padding:8px 10px;font-size:12px;color:#66520e}
+.map-network-note button{font-size:12px;text-decoration:underline;padding:0 0 0 4px}
+.leaflet-container .leaflet-control-attribution{font:11px/1.5 var(--font);background:rgb(255 255 255 / .95)}
+.leaflet-container .leaflet-control-attribution a{color:#245664}
+.leaflet-control-scale-line{font:11px var(--font);background:rgb(255 255 255 / .85);color:#354d43}
+.leaflet-container .leaflet-popup-content{font:13px/1.5 var(--font);min-width:130px;margin:12px 16px}
+.leaflet-popup-content p{margin:6px 0;font-size:12px}.leaflet-popup-content small{font-size:11px;color:var(--muted)}
+.leaflet-container .leaflet-tooltip{font:12px/1.4 var(--font)}
+@media(max-width:760px){.map-style-picker select{font-size:11px;max-width:96px}.map-stage.live .map-caption{max-width:202px;left:8px;top:12px;font-size:11px}.map-stage.live .map-tools{right:8px}.map-stage.live .map-caption svg{display:none}.map-network-note{left:8px;right:8px}}
+.road-summary{display:flex;gap:12px;align-items:center;padding:8px 14px;border-top:1px solid var(--rule);font-size:12px;min-height:38px}.road-summary label{display:flex;gap:6px;align-items:center;white-space:nowrap;font-weight:500}.road-summary input{accent-color:var(--text);margin:0}.road-summary #road-status{color:var(--muted);font-size:12px;line-height:1.4}.road-summary button{flex-shrink:0;margin-left:auto}@media(max-width:760px){.road-summary{flex-wrap:wrap;gap:4px 12px;padding:8px 10px}.road-summary #road-status{flex-basis:100%;font-size:11px}.road-summary button{margin-left:0}}
+.map-stage.live .leaflet-bottom.leaflet-left{bottom:19px}
+.leaflet-control-scale-line{text-shadow:none}

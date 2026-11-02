@@ -1,0 +1,12 @@
+type,id,name,lat,lon,demand,tw_open,tw_close,service
+depot,0,K K Wagh Engineering College Nashik,20.0135914,73.8222614,0,0,1440,0
+customer,1,Sample Delivery 01,20.0178000,73.8245000,2,0,1440,3
+customer,2,Sample Delivery 02,20.0224000,73.8260000,1,0,1440,3
+customer,3,Sample Delivery 03,20.0291000,73.8202000,2,0,1440,3
+customer,4,Sample Delivery 04,20.0245000,73.8098000,3,0,1440,3
+customer,5,Sample Delivery 05,20.0169000,73.8058000,1,0,1440,3
+customer,6,Sample Delivery 06,20.0093000,73.8009000,2,0,1440,3
+customer,7,Sample Delivery 07,20.0027000,73.8031000,1,0,1440,3
+customer,8,Sample Delivery 08,20.0018000,73.8152000,2,0,1440,3
+customer,9,Sample Delivery 09,20.0056000,73.8304000,2,0,1440,3
+customer,10,Sample Delivery 10,20.0158000,73.8381000,2,0,1440,3

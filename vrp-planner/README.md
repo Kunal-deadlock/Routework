@@ -39,7 +39,8 @@ g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude src/*.cpp -o vrp
 
 The local **Routework** interface uses the same C++ executable for optimisation
 and verification. Requires Node.js 22+ in addition to the C++ build tools. It has
-no npm dependencies or external map/font requests.
+no npm dependencies. Leaflet and fonts are bundled locally. Street tiles load
+from OpenStreetMap; road-following paths use OSRM through the local server.
 
 On Windows, double-click `start-web.cmd`, or run:
 
@@ -58,7 +59,7 @@ To use another port, set the `PORT` environment variable before starting it.
 
 - Choose the 15- or 30-stop sample, import a CSV, or edit/add/remove stops.
 - Set vehicles, capacity and routing method, then press **Plan routes**.
-- View geographic routes, zoom/pan, inspect vehicle loads and ordered stops,
+- View live street maps, zoom/pan, inspect vehicle loads and ordered stops,
   switch to listed order, and play or scrub delivery progress.
 - Use **Compare methods** to run all algorithms on the same input. **View route**
   displays any feasible result; exact proofs and search cutoffs remain distinct.
@@ -66,8 +67,33 @@ To use another port, set the `PORT` environment variable before starting it.
 - The **Experiments** tab reads the saved E1–E8 observations, with metric selection,
   selectable chart series, per-status means/sample SDs, and raw CSV download.
 
-The map is an offline coordinate view, not street navigation. Distances use the
-configured Haversine multiplier. The web adapter caps uploads at 200 customers,
+The map defaults to OpenStreetMap with **Follow roads** enabled. The C++ engine
+chooses stop order using Haversine × multiplier estimates; OSRM then finds a
+driving path in exactly that order. Solid coloured paths follow roads; dashed
+links are estimates while paths load or if routing fails. Vehicle cards and route
+details show road kilometres when available. The road summary shows driving time
+without traffic or service stops. **Planner estimate**, algorithm gaps, and the
+recorded experiments still refer to the C++ estimate objective. No road-network
+optimality is claimed. Stop popups disclose snapping to nearby roads.
+
+Playback follows returned road shapes. Browser CSV exports use available road
+distances and driving times plus service minutes, with a `distance_source` column
+(`osrm_driving` or `haversine_estimate`). CLI exports remain unchanged.
+
+Switch **Map view → Coordinates** for the offline view, or uncheck **Follow roads**
+to avoid road lookups. Only ordered coordinates are sent to OSRM, not stop names
+or demands. Tiles reveal the viewed map area to OpenStreetMap. No GPS permission,
+live traffic or turn-by-turn navigation is included.
+
+The default OSRM demo is for reasonable non-commercial use. The server caches
+geometry for one hour, coalesces matching requests, limits upstream starts to
+one per 1.1 seconds, and chunks long routes below 50 coordinates per request.
+For regular production use, configure an OSRM-compatible endpoint with the
+`ROUTING_BASE_URL` environment variable before starting the server. See the
+[OSRM demo policy](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server)
+and [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/).
+
+The web adapter caps uploads at 200 customers,
 searches at 50,000 expanded/live nodes and 500 ms, and subprocesses at 15 seconds.
 It binds to loopback only; this is a local project interface, not a hosted service.
 Requests use temporary CSV files that are cleaned up after solving. Uploaded or
@@ -78,9 +104,11 @@ The illustrative Nashik samples remain explicitly synthetic.
 make web-test
 ```
 
-This runs eight API integration tests against the real executable, covering
+This runs 16 tests, including API integration against the real executable, covering
 route coverage, capacity, visit distances, comparisons/optimality, JSON escaping,
-zero distances, infeasible packing, invalid input and local request restrictions.
+zero distances, infeasible packing, invalid input, local request restrictions,
+road geometry, chunk stitching, cache coalescing, throttling and road playback.
+Automated upstream tests use fixtures; browser QA also checks actual OSRM paths.
 The original `make test` suite still runs independently. Browser verification and
 screenshots are documented in `web/DESIGN.md`.
 

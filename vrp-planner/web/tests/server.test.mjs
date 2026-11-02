@@ -6,7 +6,7 @@ import { createApp } from '../server.mjs';
 let server,base,csv;
 before(async()=> {
   csv=await readFile(fileURLToPath(new URL('../../data/nashik_tiffin_15.csv',import.meta.url)),'utf8');
-  server=createApp();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;
+  server=createApp({roadRouter:async payload=>({source:'OSRM',received:payload.points})});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;
 });
 after(async()=> {server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
 const post=payload=>fetch(base+'/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv,vehicles:3,capacity:20,algo:'cw+2opt',...payload})});
@@ -33,6 +33,22 @@ test('sample dataset and experiment files are available',async()=> {
   const sample=await (await fetch(base+'/api/sample?size=30')).json();assert.equal(sample.vehicles,5);assert.equal(sample.sample,true);assert.equal(sample.csv.trim().split('\n').length,32);
   const rows=await (await fetch(base+'/api/benchmarks')).text();assert.equal(rows.trim().split('\n').length,2061);
   for(let e=1;e<=8;e++) {const r=await fetch(base+`/experiments/E${e}.svg`);assert.equal(r.status,200);assert.match(await r.text(),/<svg/);}
+});
+test('live map is locally bundled and permits only the intended tile provider',async()=> {
+  const response=await fetch(base);
+  assert.equal(response.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
+  const csp=response.headers.get('content-security-policy');
+  assert.match(csp,/img-src 'self' https:\/\/tile\.openstreetmap\.org data: blob:/);
+  assert.match(csp,/script-src 'self';/);
+  const page=await response.text();assert.match(page,/id="map-view"/);assert.match(page,/id="coordinate-fallback"/);
+  for(const asset of ['/street-map.js','/road-routes.js','/vendor/leaflet/leaflet.js','/vendor/leaflet/leaflet.css','/vendor/leaflet/LICENSE']) {
+    const r=await fetch(base+asset);assert.equal(r.status,200);assert.ok((await r.text()).length>100);
+  }
+});
+test('road geometry is requested through the local JSON API without exposing a remote URL parameter',async()=> {
+  const response=await fetch(base+'/api/road-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({points:[[73,20],[74,21]]})});
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{source:'OSRM',received:[[73,20],[74,21]]});
+  assert.equal((await fetch(base+'/api/road-route',{method:'POST',body:'bad'})).status,415);
 });
 test('solving uses the actual C++ engine and preserves all route data',async()=> {
   const response=await post({});assert.equal(response.status,200);const data=await response.json();

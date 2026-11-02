@@ -16,7 +16,8 @@ Sample data: `data/nashik_tiffin_15.csv` and `data/nashik_tiffin_30.csv` are syn
 No addresses, road shapes, traffic, business savings, or current experiment runs
 are invented. The experiment page shows recorded observations, not live reruns.
 The browser summary subtracts displayed two-decimal distances so the displayed
-distance savings reconcile; exported CSVs retain the engine's higher precision.
+distance savings reconcile; exports retain higher-precision measurements and
+identify whether distances come from the estimate matrix or OSRM driving paths.
 
 Checks: the C++ suite, eight real-engine API tests, and browser interactions for
 editing, replanning, selecting a vehicle, capacity rejection, route playback,
@@ -30,6 +31,19 @@ punctuation. The app inspector is the controlling check for this app interface.
 Its remaining small-text warning covers axis ticks, metadata and compact status
 labels; routing controls and numeric table values use 13px or larger text.
 
+The live-map extension preserves this design and adds locally bundled Leaflet
+1.9.4 (BSD-2-Clause, `public/vendor/leaflet/LICENSE`) with attributed OpenStreetMap
+tiles. Road shapes come from OSRM via the local server. Solid coloured paths are
+road geometry; dashed coloured links are estimates, and fine dotted links show
+snapping from original coordinates to drivable roads. Raw tile colours are map
+data, not additional interface accent colours. Both coordinate view and tile-error
+fallback remain available. Playback follows the road geometry per delivery leg.
+
+The main distance metric is explicitly a planner estimate. Road totals, driving
+minutes, vehicle cards and exported CSVs identify their different source. The
+estimate optimiser's proof status does not claim optimality on road distances.
+The recorded E1–E8 data has not been reinterpreted as road-network measurements.
+
 Local font files are IBM Plex, redistributed under the SIL Open Font License in
 `public/fonts/OFL.txt`. `charts.js` starts from the design skill's app chart helper;
 the local version adds numeric size spacing and matching numeric-axis hover.
@@ -40,3 +54,13 @@ button, the 18-method comparison, edited names in computed visit order, capacity
 errors clearing stale results, the 30-stop/four-vehicle sample, and an actual
 CSV download with 30 distinct customers and eight depot endpoints.
 Both screen inspections passed with zero FAIL findings at all three widths.
+
+Road-map extension validation: all 16 web/routing tests pass, and all 6,473 C++
+checks still pass. The real synthetic 15-stop lookup returned 717 road vertices
+for vehicle 1 and 404 for vehicle 2, with 11 and 6 delivery legs respectively.
+The real road distances were 32.9054 km and 14.1173 km; the downloaded CSV retained
+their sum, 47.0227 km, with `osrm_driving` source labels. The visible road total
+sums the displayed two-decimal vehicle distances. Browser checks cover road / link
+switching, road-following playback, offline coordinate fallback and CSV export.
+Desktop, tablet and phone inspections pass; Leaflet's default scale text shadow
+was removed to preserve the existing flat interface style.

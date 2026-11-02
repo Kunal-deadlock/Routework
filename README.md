@@ -33,9 +33,10 @@ not bundled with this repository.
 - Backtracking, FIFO/LIFO/least-cost Branch and Bound, Held–Karp and exact subset DP.
 - Custom min-heap, heap sort, Prim and Kruskal lower bounds, counters and timers.
 - A browser planner with editable stops, CSV import/export, route playback, vehicle
-  capacity views, algorithm comparisons and interactive experiment results.
+  capacity views, live OpenStreetMap maps, OSRM road-following paths, algorithm
+  comparisons and interactive experiment results.
 - Ten-run E1–E8 measurements: **2,060 records**, summaries, graphs and route drawings.
-- **6,473 C++ checks**, CLI regressions and eight real-engine web API tests.
+- **6,473 C++ checks**, CLI regressions and 16 web/routing tests.
 
 ```sh
 ./vrp solve --input data/nashik_tiffin_15.csv --vehicles 3 --capacity 20 --algo cw+2opt
@@ -43,8 +44,10 @@ not bundled with this repository.
 make web-test
 ```
 
-The Nashik datasets are explicitly **synthetic illustrative samples**. Maps show
-coordinates and estimated distances, not street navigation or live traffic.
+The Nashik datasets are explicitly **synthetic illustrative samples**. The planner
+chooses stop order using distance estimates; OSRM displays driving paths and road
+kilometres for that order. Street maps and road lookup need internet access.
+No live traffic or GPS tracking is included; the offline coordinate view remains.
 
 See the [full README](vrp-planner/README.md), [project report](vrp-planner/REPORT.md),
 [demo guide](vrp-planner/DEMO.md), and [experiment results](vrp-planner/results/results.csv).

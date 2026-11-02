@@ -6,16 +6,17 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
+import { createRoadRouter } from './roads.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const assets = join(root, 'web', 'public');
 const binary = join(root, process.platform === 'win32' ? 'vrp.exe' : 'vrp');
 const algorithms = new Set(['baseline','nn','cw','sweep','bt','bb-fifo','bb-lifo','bb-lc','hk','exact', ...['baseline','nn','cw','sweep'].flatMap(a => [a+'+2opt',a+'+local'])]);
-const files = new Map(['index.html','app.js','styles.css','charts.js',...['sans-400','sans-500','sans-600','mono-400','mono-500'].map(name=>'fonts/plex-'+name+'.ttf')].map(name => ['/'+name, join(assets,name)]));
+const files = new Map(['index.html','app.js','styles.css','charts.js','street-map.js','road-routes.js','vendor/leaflet/leaflet.js','vendor/leaflet/leaflet.css','vendor/leaflet/LICENSE',...['sans-400','sans-500','sans-600','mono-400','mono-500'].map(name=>'fonts/plex-'+name+'.ttf')].map(name => ['/'+name, join(assets,name)]));
 const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.ttf':'font/ttf','.csv':'text/csv; charset=utf-8','.svg':'image/svg+xml'};
 let active = 0;
 function fail(message, status=400) {return Object.assign(new Error(message), {status});}
 function send(res, status, body, type='application/json; charset=utf-8') {
-  res.writeHead(status, {'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'"});
+  res.writeHead(status, {'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://tile.openstreetmap.org data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'"});
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 async function body(req) {
@@ -62,7 +63,7 @@ export async function solve(payload) {
     return result;
   } finally {--active;if(dir) await rm(dir,{recursive:true,force:true});}
 }
-export function createApp() {
+export function createApp({roadRouter=createRoadRouter()}={}) {
   return http.createServer(async (req,res) => {
     try {
       const host=req.headers.host || '';
@@ -72,6 +73,10 @@ export function createApp() {
       if(req.method==='POST' && url.pathname==='/api/solve') {
         if(!/^application\/json\b/.test(req.headers['content-type']||'')) throw fail('Send routing data as JSON.',415);
         return send(res,200,await solve(await body(req)));
+      }
+      if(req.method==='POST' && url.pathname==='/api/road-route') {
+        if(!/^application\/json\b/.test(req.headers['content-type']||'')) throw fail('Send road coordinates as JSON.',415);
+        return send(res,200,await roadRouter(await body(req)));
       }
       if(req.method!=='GET') throw fail('This action is not supported.',405);
       if(url.pathname==='/api/health') return send(res,200,{ok:true,engine:'C++17'});

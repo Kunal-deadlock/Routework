@@ -1,5 +1,25 @@
 # Dataset provenance
 
+## K. K. Wagh import sample
+
+`kkwagh_sample_10.csv` contains one depot at K. K. Wagh Institute of Engineering
+Education & Research, Amrutdham, Panchavati, Nashik, and ten fictional delivery stops.
+The approximate depot coordinate (20.0135914, 73.8222614) comes from the map embedded
+on the college's [official contact page](https://www.kkwagh.edu.in/engineering/contact-us).
+It is a campus map point, not a surveyed vehicle entrance. Delivery locations and
+demands are illustrative sample data, not real customers.
+
+Import it using **Import CSV**. Suggested settings: **2 vehicles**, **capacity 10**
+each, **Clarke–Wright**, and **2-opt** enabled. Total demand is 18 units. Every
+vehicle starts and ends at the depot automatically; include the depot only once
+in the input CSV, rather than repeating it as the last row.
+
+```sh
+./vrp solve --input data/kkwagh_sample_10.csv --vehicles 2 --capacity 10 --algo cw+2opt
+```
+
+## Seeded Nashik samples
+
 `nashik_tiffin_15.csv` and `nashik_tiffin_30.csv` are **illustrative synthetic**
 datasets, not real customers or map-collected delivery stops. No private addresses
 or observed road distances are included.
